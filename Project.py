@@ -3,6 +3,9 @@ import tempfile
 import os
 import traceback 
 
+# [변경 1] 환경 변수 로드를 위한 라이브러리 임포트
+from dotenv import load_dotenv
+
 # LangChain 관련 모듈 임포트
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -13,18 +16,26 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
+# [변경 2] .env 파일 활성화 (로컬 개발 시 .env 파일에서 키를 읽어옴)
+load_dotenv()
+
 # 1. 페이지 기본 설정
 st.set_page_config(page_title="나만의 RAG 챗봇", page_icon="🤖")
 st.title("🤖 PDF 기반 RAG 챗봇")
 
+# [변경 3] API KEY 입력창 제거 -> 환경 변수에서 가져오기
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# API Key가 없는 경우 경고 표시 및 중단
+if not openai_api_key:
+    st.error("환경 변수 `OPENAI_API_KEY`가 설정되지 않았습니다. .env 파일이나 시스템 환경 변수를 확인해주세요.")
+    st.stop()  # 키가 없으면 앱 실행을 여기서 멈춤
+
+st.markdown("---")
+
 # 사이드바: 설정 및 입력
 with st.sidebar:
     st.header("설정 (Configuration)")
-    
-    # API KEY 입력
-    openai_api_key = st.text_input("OpenAI API Key", type="password")
-
-    st.markdown("---")
     
     # 2. 문서 업로드 및 카테고리 선택
     st.subheader("문서 업로드 & 선택")
@@ -87,22 +98,22 @@ def split_text(docs):
     )
     return text_splitter.split_documents(docs)
 
-def create_vectorstore(chunks, api_key):
+def create_vectorstore(chunks):
     """
     [Embedding & VectorStore] 임베딩 생성 및 FAISS 저장소 구축
+    [변경 4] openai_api_key 인자 제거 (LangChain이 환경변수를 자동 인식함, 혹은 전역 변수 사용)
     """
-    # model 이름 수정: text_embedding... -> text-embedding... (하이픈 사용)
-    # openai_api_key 직접 전달
     embeddings = OpenAIEmbeddings(
         model="text-embedding-3-small", 
-        openai_api_key=api_key
+        openai_api_key=openai_api_key  # 전역 변수 혹은 환경변수 사용
     )
     vectorstore = FAISS.from_documents(chunks, embeddings)
     return vectorstore
 
-def get_rag_chain(vectorstore, system_prompt, api_key):
+def get_rag_chain(vectorstore, system_prompt):
     """
     [Chain] Retriever, Prompt, LLM 연결
+    [변경 5] api_key 인자 제거
     """
     # 1. Retriever 설정 (MMR 방식)
     retriever = vectorstore.as_retriever(
@@ -110,15 +121,15 @@ def get_rag_chain(vectorstore, system_prompt, api_key):
         search_kwargs={"k": 3, "lambda_mult": 0.8}
     )
 
-    # 2. Prompt Template 설정 (사용자 입력 시스템 프롬프트 반영)
+    # 2. Prompt Template 설정
     template = system_prompt + "\n\n#문맥:\n{context}\n\n#질문:\n{question}\n\n#답변:"
     prompt = PromptTemplate.from_template(template)
 
-    # 3. LLM 설정 (API Key 직접 전달)
+    # 3. LLM 설정
     llm = ChatOpenAI(
         model_name="gpt-4o-mini", 
         temperature=0,
-        openai_api_key=api_key
+        openai_api_key=openai_api_key # 전역 변수 사용
     )
 
     # 4. Chain 구성 (LCEL 문법)
@@ -137,9 +148,8 @@ def get_rag_chain(vectorstore, system_prompt, api_key):
 
 # 버튼이 눌리면 문서 처리 시작
 if process_btn:
-    if not openai_api_key:
-        st.error("OpenAI API Key를 입력해주세요.")
-    elif not selected_doc:
+    # [변경 6] API Key 유효성 검사 로직 제거 (위에서 st.stop으로 이미 처리됨)
+    if not selected_doc:
         st.error("문서를 업로드하고 선택해주세요.")
     else:
         with st.spinner(f"'{selected_doc.name}' 문서를 분석 중입니다..."):
@@ -148,10 +158,11 @@ if process_btn:
                 raw_docs = process_pdf(selected_doc)
                 # 2. Text Split
                 chunks = split_text(raw_docs)
-                # 3. Embedding & VectorStore (API Key 전달)
-                vectorstore = create_vectorstore(chunks, openai_api_key)
+                # 3. Embedding & VectorStore
+                # [변경 7] 인자 전달 방식 간소화
+                vectorstore = create_vectorstore(chunks)
                 
-                # 세션에 저장 (매번 다시 만들지 않기 위해)
+                # 세션에 저장
                 st.session_state["vectorstore"] = vectorstore
                 
                 # 채팅 기록 초기화
@@ -174,25 +185,22 @@ if query := st.chat_input("질문을 입력하세요..."):
 
     # 답변 생성
     if st.session_state["vectorstore"] is not None:
-        if not openai_api_key:
-             st.error("API Key가 필요합니다.")
-        else:
-            try:
-                # Chain 생성 (API Key 전달)
-                rag_chain = get_rag_chain(
-                    st.session_state["vectorstore"], 
-                    system_prompt_input,
-                    openai_api_key
-                )
-                
-                with st.chat_message("assistant"):
-                    with st.spinner("생각 중..."):
-                        response = rag_chain.invoke(query)
-                        st.write(response)
-                
-                # 답변 저장
-                st.session_state["messages"].append({"role": "assistant", "content": response})
-            except Exception as e:
-                st.error(f"답변 생성 중 오류가 발생했습니다: {e}")
+        try:
+            # Chain 생성
+            # [변경 8] 인자 전달 방식 간소화
+            rag_chain = get_rag_chain(
+                st.session_state["vectorstore"], 
+                system_prompt_input
+            )
+            
+            with st.chat_message("assistant"):
+                with st.spinner("생각 중..."):
+                    response = rag_chain.invoke(query)
+                    st.write(response)
+            
+            # 답변 저장
+            st.session_state["messages"].append({"role": "assistant", "content": response})
+        except Exception as e:
+            st.error(f"답변 생성 중 오류가 발생했습니다: {e}")
     else:
         st.warning("먼저 문서를 업로드하고 '초기화' 버튼을 눌러주세요.")
