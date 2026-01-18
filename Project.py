@@ -20,8 +20,8 @@ from langchain_core.runnables import RunnablePassthrough
 load_dotenv()
 
 # 1. 페이지 기본 설정
-st.set_page_config(page_title="나만의 RAG 챗봇", page_icon="🤖")
-st.title("🤖 PDF 기반 RAG 챗봇")
+st.set_page_config(page_title="나만의 RAG 챗봇", page_icon="🐻")
+st.title("🐻 PDF 기반 RAG 챗봇")
 
 # [변경 3] API KEY 입력창 제거 -> 환경 변수에서 가져오기
 openai_api_key = os.getenv("OPENAI_API_KEY")
