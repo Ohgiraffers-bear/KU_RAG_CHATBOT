@@ -23,7 +23,7 @@ jobs:
           script: |
             REPO_URL="https://github.com/Ohgiraffers-bear/KU_RAG_CHATBOT.git"
             DIR_NAME="KU_RAG_CHATBOT"
-            FILE_NAME="app.py"
+            FILE_NAME="Project.py"
             PORT="8501"
 
             # 폴더 없으면 Clone, 있으면 Pull
