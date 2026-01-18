@@ -3,24 +3,22 @@ name: Deploy Streamlit to EC2
 on:
   push:
     branches:
-      - main  # main 브랜치에 push될 때 트리거
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-	steps:
+    steps: # [수정됨] runs-on과 동일한 위치로 들여쓰기 수정 (스페이스 4칸)
       - name: SSH Remote Commands
         uses: appleboy/ssh-action@v1.0.3
         env:
-          # 1. GitHub Secret을 워크플로우 환경변수로 가져옵니다.
           ENV_CONTENTS: ${{ secrets.ENV_FILE }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           port: 22
-          # 2. 스크립트 내부에서 사용할 환경변수 이름을 등록합니다.
           envs: ENV_CONTENTS
           script: |
             REPO_URL="https://github.com/Ohgiraffers-bear/KU_RAG_CHATBOT.git"
@@ -37,11 +35,9 @@ jobs:
               cd $DIR_NAME
             fi
 
-            # --- [핵심 변경 사항] .env 파일 생성 ---
-            # Secret에 저장된 내용을 .env 파일로 덮어씁니다.
+            # .env 파일 생성
             echo "$ENV_CONTENTS" > .env
             echo ".env file created successfully."
-            # ------------------------------------
 
             if [ -f "requirements.txt" ]; then
               pip install -r requirements.txt
