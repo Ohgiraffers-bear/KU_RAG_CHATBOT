@@ -1,0 +1,55 @@
+name: Deploy Streamlit to EC2
+
+on:
+  push:
+    branches:
+      - main  # main 브랜치에 push될 때 트리거
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Remote Commands
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            # 1. 변수 설정 (여기를 본인 환경에 맞게 수정하세요)
+            REPO_URL="https://github.com/Ohgiraffers-bear/KU_RAG_CHATBOT.git"
+            DIR_NAME="KU_RAG_CHATBOT"
+            FILE_NAME="app.py"   # 실행할 스트림릿 파일 이름 (예: main.py, app.py)
+            PORT="8501"          # 사용할 포트 번호
+
+            # 2. Git Clone 또는 Pull (폴더가 없으면 Clone, 있으면 Pull)
+            if [ -d "$DIR_NAME" ]; then
+              echo "Repository exists. Pulling latest changes..."
+              cd $DIR_NAME
+              git pull origin main
+            else
+              echo "Repository does not exist. Cloning..."
+              git clone $REPO_URL
+              cd $DIR_NAME
+            fi
+
+            # 3. 필요 패키지 설치 (requirements.txt가 있을 경우)
+            if [ -f "requirements.txt" ]; then
+              pip install -r requirements.txt
+            fi
+
+            # 4. 기존 프로세스 종료 (포트 충돌 방지)
+            # 해당 포트를 사용 중인 프로세스를 찾아 종료합니다.
+            PID=$(lsof -t -i:$PORT)
+            if [ -n "$PID" ]; then
+              echo "Killing existing process on port $PORT..."
+              kill -9 $PID
+            fi
+
+            # 5. Streamlit 백그라운드 실행 (nohup)
+            echo "Starting Streamlit app..."
+            nohup streamlit run $FILE_NAME --server.port $PORT --server.runOnSave true > nohup.out 2>&1 &
+
+            echo "Deployment complete!"
