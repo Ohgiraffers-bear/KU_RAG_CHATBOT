@@ -3,8 +3,7 @@ name: Deploy Streamlit to EC2 (Conda)
 on:
   push:
     branches:
-      - main
-
+      - master
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -24,11 +23,11 @@ jobs:
             # ==========================================
             # [사용자 설정] 아래 변수들을 상황에 맞게 수정하세요
             # ==========================================
-            REPO_URL="https://github.com/Ohgiraffers-bear/KU_RAG_CHATBOT.git"
+            REPO_URL="https://github.com/yeonwhi1/KU_RAG_CHATBOT.git"
             DIR_NAME="KU_RAG_CHATBOT"
-            FILE_NAME="Project.py" # <--- [중요] 여기에 실행시킬 파일명을 작성하세요!
+            FILE_NAME="Project.py"
             PORT="8501"
-            CONDA_ENV="bear"  # <--- [중요] 여기에 생성해둔 가상환경 이름을 넣으세요!
+            CONDA_ENV="whii"  # <--- [중요] 여기에 생성해둔 가상환경 이름을 넣으세요!
             # ==========================================
 
             # 1. Miniforge 활성화 (SSH에서는 .bashrc가 자동 로드되지 않을 수 있음)
